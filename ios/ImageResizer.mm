@@ -23,12 +23,12 @@ NSString *moduleName = @"ImageResizer";
 
 RCT_EXPORT_MODULE()
 
-RCT_REMAP_METHOD(createResizedImage, uri:(NSString *)uri width:(double)width height:(double)height format:(NSString *)format quality:(double)quality mode:(NSString *)mode onlyScaleDown:(BOOL)onlyScaleDown rotation:(nonnull NSNumber *)rotation outputPath:(NSString *)outputPath keepMeta:(nonnull NSNumber *)keepMeta resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_REMAP_METHOD(createResizedImage, uri:(NSString *)uri width:(double)width height:(double)height format:(NSString *)format quality:(double)quality mode:(NSString *)mode onlyScaleDown:(BOOL)onlyScaleDown rotation:(nonnull NSNumber *)rotation flipHorizontal:(BOOL)flipHorizontal outputPath:(NSString *)outputPath keepMeta:(nonnull NSNumber *)keepMeta resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 {
-    [self createResizedImage:uri width:width height:height format:format quality:quality mode:mode onlyScaleDown:onlyScaleDown rotation:rotation outputPath:outputPath keepMeta:keepMeta resolve:resolve reject:reject];
+    [self createResizedImage:uri width:width height:height format:format quality:quality mode:mode onlyScaleDown:onlyScaleDown rotation:rotation flipHorizontal:flipHorizontal outputPath:outputPath keepMeta:keepMeta resolve:resolve reject:reject];
 }
 
-- (void)createResizedImage:(NSString *)uri width:(double)width height:(double)height format:(NSString *)format quality:(double)quality mode:(NSString *)mode onlyScaleDown:(BOOL)onlyScaleDown rotation:(nonnull NSNumber *)rotation outputPath:(NSString *)outputPath keepMeta:(nonnull NSNumber *)keepMeta resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
+- (void)createResizedImage:(NSString *)uri width:(double)width height:(double)height format:(NSString *)format quality:(double)quality mode:(NSString *)mode onlyScaleDown:(BOOL)onlyScaleDown rotation:(nonnull NSNumber *)rotation flipHorizontal:(BOOL)flipHorizontal outputPath:(NSString *)outputPath keepMeta:(nonnull NSNumber *)keepMeta resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         @try {
             CGSize newSize = CGSizeMake(width, height);
@@ -64,7 +64,7 @@ RCT_REMAP_METHOD(createResizedImage, uri:(NSString *)uri width:(double)width hei
                     reject([NSString stringWithFormat: @"%ld", (long)error.code], error.description, nil);
                     return;
                 }
-                NSDictionary * response =  transformImage(image, uri, [rotation integerValue], newSize, fullPath, format, (int)quality, [keepMeta boolValue], @{@"mode": mode, @"onlyScaleDown": [NSNumber numberWithBool:onlyScaleDown]});
+                NSDictionary * response =  transformImage(image, uri, [rotation integerValue], newSize, fullPath, format, (int)quality, [keepMeta boolValue], @{@"mode": mode, @"onlyScaleDown": [NSNumber numberWithBool:onlyScaleDown], @"flipHorizontal": [NSNumber numberWithBool:flipHorizontal]});
                 resolve(response);
             }];
         } @catch (NSException *exception) {
@@ -227,6 +227,43 @@ UIImage * rotateImage(UIImage *inputImage, float rotationDegrees)
     }
 }
 
+UIImage * flipImageHorizontally(UIImage *inputImage)
+{
+    UIImageOrientation orientation = UIImageOrientationUpMirrored;
+    
+    // Preserve the existing rotation when flipping
+    switch (inputImage.imageOrientation) {
+        case UIImageOrientationUp:
+            orientation = UIImageOrientationUpMirrored;
+            break;
+        case UIImageOrientationDown:
+            orientation = UIImageOrientationDownMirrored;
+            break;
+        case UIImageOrientationLeft:
+            orientation = UIImageOrientationRightMirrored;
+            break;
+        case UIImageOrientationRight:
+            orientation = UIImageOrientationLeftMirrored;
+            break;
+        case UIImageOrientationUpMirrored:
+            orientation = UIImageOrientationUp;
+            break;
+        case UIImageOrientationDownMirrored:
+            orientation = UIImageOrientationDown;
+            break;
+        case UIImageOrientationLeftMirrored:
+            orientation = UIImageOrientationRight;
+            break;
+        case UIImageOrientationRightMirrored:
+            orientation = UIImageOrientationLeft;
+            break;
+    }
+    
+    return [[UIImage alloc] initWithCGImage: inputImage.CGImage
+                                      scale: inputImage.scale
+                                orientation: orientation];
+}
+
 float getScaleForProportionalResize(CGSize theSize, CGSize intoSize, bool onlyScaleDown, bool maximize)
 {
     float    sx = theSize.width;
@@ -387,6 +424,14 @@ NSDictionary * transformImage(UIImage *image,
         image = rotateImage(image, rotation);
         if (image == nil) {
             [NSException raise:moduleName format:@"Can't rotate the image."];
+        }
+    }
+    
+    // Flip image horizontally if specified
+    if ([[options objectForKey:@"flipHorizontal"] boolValue]) {
+        image = flipImageHorizontally(image);
+        if (image == nil) {
+            [NSException raise:moduleName format:@"Can't flip the image horizontally."];
         }
     }
     

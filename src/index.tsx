@@ -1,4 +1,4 @@
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import type { Options, ResizeFormat, Response } from './types';
 export type { ResizeFormat, ResizeMode, Response } from './types';
 
@@ -21,12 +21,27 @@ function createResizedImage(
   format: ResizeFormat,
   quality: number,
   rotation: number = 0,
+  flipHorizontal: boolean,
   outputPath?: string | null,
   keepMeta = false,
   options: Options = defaultOptions
 ): Promise<Response> {
   const { mode, onlyScaleDown } = { ...defaultOptions, ...options };
-
+ if ( Platform.OS === 'ios') {
+  return ImageResizer.createResizedImage(
+    uri,
+    width,
+    height,
+    format,
+    quality,
+    mode,
+    onlyScaleDown,
+    rotation,
+    flipHorizontal,
+    outputPath,
+    keepMeta
+  ) 
+ } 
   return ImageResizer.createResizedImage(
     uri,
     width,
